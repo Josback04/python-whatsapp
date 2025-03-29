@@ -3,6 +3,10 @@ import os
 from dotenv import load_dotenv
 import logging
 
+import redis
+
+
+
 
 def load_configurations(app):
     load_dotenv()
@@ -22,3 +26,5 @@ def configure_logging():
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         stream=sys.stdout,
     )
+
+redis_client = redis.StrictRedis(host="localhost", port=6379, db=0, decode_responses=True)

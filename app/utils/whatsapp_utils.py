@@ -2,10 +2,18 @@ import logging
 from flask import current_app, jsonify
 import json
 import requests
+import redis
+from app.questions import QUESTIONS
 
 # from app.services.openai_service import generate_response
-import re
+import re 
 
+
+# Connexion Redis (assure-toi que Redis tourne)
+redis_client = redis.StrictRedis(host="localhost", port=6379, db=0, decode_responses=True)
+
+
+CATEGORY_ORDER = list(QUESTIONS.keys())  # Ordre des catégories
 
 def log_http_response(response):
     logging.info(f"Status: {response.status_code}")
@@ -77,21 +85,47 @@ def process_text_for_whatsapp(text):
 
 def process_whatsapp_message(body):
     wa_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
-    name = body["entry"][0]["changes"][0]["value"]["contacts"][0]["profile"]["name"]
+    message_body = body["entry"][0]["changes"][0]["value"]["messages"][0]["text"]["body"]
 
-    message = body["entry"][0]["changes"][0]["value"]["messages"][0]
-    message_body = message["text"]["body"]
+    current_category = redis_client.hget(wa_id, "current_category")
+    current_question_index = redis_client.hget(wa_id, "current_question_index")
 
-    # TODO: implement custom function here
-    response = generate_response(message_body)
+    if current_category is None or current_question_index is None:  # Début de la discussion
+        current_category = CATEGORY_ORDER[0]
+        current_question_index = 0
+        redis_client.hset(wa_id, "current_category", current_category)
+        redis_client.hset(wa_id, "current_question_index", current_question_index)
+        response = QUESTIONS[current_category][current_question_index]
+    else:
+        current_question_index = int(current_question_index) + 1
 
-    # OpenAI Integration
-    # response = generate_response(message_body, wa_id, name)
-    # response = process_text_for_whatsapp(response)
+        if current_question_index >= len(QUESTIONS[current_category]):  # Passer à la catégorie suivante
+            category_index = CATEGORY_ORDER.index(current_category) + 1
+            if category_index >= len(CATEGORY_ORDER):  # Fin des questions
+                response = "Merci d'avoir répondu à toutes les questions ! 😊"
+                redis_client.delete(wa_id)  # Supprime l'historique de l'utilisateur
+            else:
+                current_category = CATEGORY_ORDER[category_index]
+                current_question_index = 0
+                redis_client.hset(wa_id, "current_category", current_category)
+                redis_client.hset(wa_id, "current_question_index", current_question_index)
+                response = QUESTIONS[current_category][current_question_index]
+        else:
+            redis_client.hset(wa_id, "current_question_index", current_question_index)
+            response = QUESTIONS[current_category][current_question_index]
 
-    data = get_text_message_input(current_app.config["RECIPIENT_WAID"], response)
+    # Réinitialisation si l'utilisateur tape "restart"
+    if message_body.lower() == "restart":
+        redis_client.delete(wa_id)
+        current_category = CATEGORY_ORDER[0]
+        current_question_index = 0
+        redis_client.hset(wa_id, "current_category", current_category)
+        redis_client.hset(wa_id, "current_question_index", current_question_index)
+        response = QUESTIONS[current_category][current_question_index]
+
+    # Envoi de la réponse
+    data = get_text_message_input(wa_id, response)
     send_message(data)
-
 
 def is_valid_whatsapp_message(body):
     """
