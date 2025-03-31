@@ -1,2 +1,46 @@
-# Created by venv; see https://docs.python.org/3/library/venv.html
-*
+# Environnements virtuels
+.venv/
+venv/
+env/
+ENV/
+
+# Fichiers de cache et builds
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Installations pip
+pip-selfcheck.json
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+*.whl
+
+# Fichiers de configuration sensible
+.env
+.secret
+*.env
+*.key
+credentials.json
+
+# IDE/Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Notebooks Jupyter (si utilisé)
+.ipynb_checkpoints/
+
+# Tests et coverage
+.coverage
+htmlcov/
+.pytest_cache/
+test_output/
+
+# Système
+.DS_Store  (macOS)
+Thumbs.db  (Windows)
