@@ -53,3 +53,4 @@ websockets==14.2
 flask
 redis
 gunicorn 
+python-docx
