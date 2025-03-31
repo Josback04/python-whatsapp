@@ -28,6 +28,9 @@ def load_configurations(app):
 
 
 PDF_DIR = os.getenv("PDF_DIR")
+host=os.getenv("REDIS_HOST")
+port=os.getenv("REDIS_PORT")
+password= os.getenv("REDIS_PASSWORD")
 
 
 def configure_logging():
@@ -37,4 +40,4 @@ def configure_logging():
         stream=sys.stdout,
     )
 
-redis_client = redis.StrictRedis(host="localhost", port=6379, db=0, decode_responses=True)
+redis_client = redis.StrictRedis(host=host, db=0, password=password, decode_responses=True)
