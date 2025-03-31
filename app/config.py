@@ -18,6 +18,16 @@ def load_configurations(app):
     app.config["VERSION"] = os.getenv("VERSION")
     app.config["PHONE_NUMBER_ID"] = os.getenv("PHONE_NUMBER_ID")
     app.config["VERIFY_TOKEN"] = os.getenv("VERIFY_TOKEN")
+    app.config["GEMINI_KEY"] = os.getenv("GEMINI_KEY")
+
+    app.config["DB_HOST"] = os.getenv("DB_HOST")
+    app.config["DB_USER"] = os.getenv("DB_USER")
+    app.config["DB_PASSWORD"] = os.getenv("DB_PASSWORD")
+    app.config["DB_NAME"] = os.getenv("DB_NAME")
+
+
+
+PDF_DIR = os.getenv("PDF_DIR")
 
 
 def configure_logging():
