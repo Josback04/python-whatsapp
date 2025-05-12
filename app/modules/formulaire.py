@@ -4,7 +4,6 @@ from app.questions import QUESTIONS # Importer les questions
 from app.database.database import save_response_to_db
 from app.services.gemini import ask_ai
 from app.services.docx_service import generate_docx
-from app.utils.whatsapp_utils import send_document_message, send_message, get_text_message_input, delete_user_state
 CATEGORY_ORDER = list(QUESTIONS.keys())
 
 def start_formulaire(wa_id):
@@ -28,6 +27,9 @@ def start_formulaire(wa_id):
 
 def handle_message(wa_id, message_body, state):
     """Gère un message lorsque l'utilisateur est dans le module formulaire."""
+
+    from app.utils.whatsapp_utils import send_document_message, send_message, get_text_message_input, delete_user_state
+
     logging.info(f"Traitement FORMULAIRE pour {wa_id}: {message_body}")
     
     category_index = state.get("category_index", 0)
