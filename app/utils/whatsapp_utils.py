@@ -186,7 +186,7 @@ def process_text_for_whatsapp(text):
 
 MAIN_MENU_TEXT = """Bienvenu chez I&F Entrepreneuriat ! 😊 Que souhaitez-vous faire ?
 
-1. 📝 Remplir le formulaire de candidature COPA
+1. 📝 Remplir le formulaire pour votre plan d'affaire
 2. 📊 Calculer le Coût Variable Unitaire (CVU)
 3. 📈 Calculer les Coûts Fixes (CF) 
 4. 🏗️ Enregistrer une immobilisation
