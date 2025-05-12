@@ -1,80 +1,106 @@
 # app/modules/calcul_cfu.py
 import logging
-# Import the excel generation function
 from app.services.excel_service import generate_cfu_excel
 # from app.utils.whatsapp_utils import send_message, get_text_message_input, delete_user_state
 
 def start_cfu(wa_id):
-    # ... (votre code existant) ...
+    """Initialise le module CFU."""
     logging.info(f"Démarrage du module CFU pour {wa_id}")
-    response = "Calculons vos Coûts Fixes (CF) totaux.\n\nQuel est le montant de votre loyer (ou charge similaire) pour la période ? (Mettez 0 si non applicable)"
+    response = ("Calculons vos Coûts Fixes Annualisés.\n\n"
+                "Entrez le nom du premier coût fixe (ex: Loyer, Salaire Admin, Abonnement Internet):")
     state = {
         "module": "CFU",
-        "step": "ASK_RENT",
-        "data": {}
+        "step": "ASK_ITEM_NAME",
+        "data": {"items_list": []},
+        "current_item": {}
     }
     state["response"] = response
     return state
 
 def handle_message(wa_id, message_body, state):
-    # Déplacer les imports nécessaires ici
+    """Gère la conversation pour le module CFU."""
     from app.utils.whatsapp_utils import send_message, get_text_message_input, delete_user_state
 
-    logging.info(f"Traitement CFU pour {wa_id} (step={state.get('step')}): {message_body}")
     step = state.get("step")
-    data = state.get("data", {})
-    response = "Je n'ai pas compris. Pouvez-vous entrer un montant numérique ?"
+    data = state.get("data", {"items_list": []})
+    current_item = state.get("current_item", {})
+    response = "Je n'ai pas bien compris. Pouvez-vous réessayer ?"
 
     try:
-        cost = float(message_body.replace(",", "."))
-        if cost < 0:
-             response = "Le montant doit être positif ou zéro. Veuillez entrer une valeur correcte."
-             state["response"] = response
-             return state
+        if step == "ASK_ITEM_NAME":
+            current_item["name"] = message_body.strip()
+            response = f"Coût Fixe : '{current_item['name']}'.\nQuel est le montant ($) payé par période pour ce coût ? (ex: 500)"
+            state["step"] = "ASK_COST_PER_PERIOD"
 
-        if step == "ASK_RENT":
-            data["rent"] = cost
-            response = "Compris. Quel est le montant total des salaires et charges sociales fixes pour la période ?"
-            state["step"] = "ASK_SALARIES"
-
-        elif step == "ASK_SALARIES":
-            data["salaries"] = cost
-            response = "Bien noté. Avez-vous d'autres coûts fixes (assurances, abonnements, etc.) ? Si oui, entrez leur montant total, sinon entrez 0."
-            state["step"] = "ASK_OTHERS"
-
-        elif step == "ASK_OTHERS":
-            data["others"] = cost
-
-            # Calcul final
-            total_cf = data.get("rent", 0) + data.get("salaries", 0) + data.get("others", 0)
-            data["total_cf"] = total_cf # Stocker le total dans data
-            response = f"Calcul terminé ! Le total de vos Coûts Fixes (CF) est de : {total_cf:.2f}.\n\nPréparation de votre fichier Excel..."
-
-            # Envoyer message de calcul + attente
-            processing_data = get_text_message_input(wa_id, response)
-            send_message(processing_data)
-
-            # Générer Excel et obtenir URL
-            drive_url = generate_cfu_excel(wa_id, data) # Passer tout le dict data
-
-            if drive_url:
-                final_response = f"Voici le lien vers votre fichier Excel des coûts fixes : {drive_url}"
+        elif step == "ASK_COST_PER_PERIOD":
+            cost = float(message_body.replace(",", "."))
+            if cost < 0:
+                response = "Le coût ne peut pas être négatif. Entrez une valeur correcte."
             else:
-                final_response = "Le calcul est terminé, mais une erreur est survenue lors de la création du fichier Excel."
+                current_item["cost_per_period"] = cost
+                response = (f"Montant : {cost:.2f}$.\n"
+                            "Ce montant couvre quelle période ? Entrez le nombre de mois (ex: 1 pour mensuel, 3 pour trimestriel, 12 pour annuel):")
+                state["step"] = "ASK_PERIOD_MONTHS"
 
-            # Fin du module CFU
-            delete_user_state(wa_id)
-            return {"module": "FINISHED", "response": final_response}
+        elif step == "ASK_PERIOD_MONTHS":
+            months = int(message_body)
+            if months <= 0 or months > 1200: # Ajouter une limite supérieure raisonnable
+                 response = "La période doit être un nombre de mois positif (généralement entre 1 et 12). Veuillez corriger."
+            else:
+                current_item["period_months"] = months
+                # Item complet, ajouter à la liste
+                data["items_list"].append(current_item)
+                logging.info(f"Élément CFU ajouté : {current_item}")
+                state["current_item"] = {} # Réinitialiser
+
+                response = (f"Coût Fixe '{current_item['name']}' ajouté (Coût: {current_item['cost_per_period']:.2f}$ / {current_item['period_months']} mois).\n\n"
+                            "Voulez-vous ajouter un autre coût fixe ? (oui/non)")
+                state["step"] = "ASK_MORE_ITEMS"
+
+        elif step == "ASK_MORE_ITEMS":
+            answer = message_body.lower()
+            if answer == 'oui':
+                response = "Quel est le nom du nouveau coût fixe ?"
+                state["step"] = "ASK_ITEM_NAME"
+            elif answer == 'non':
+                if not data["items_list"]:
+                     response = "Aucun coût fixe n'a été enregistré. Retour au menu."
+                     delete_user_state(wa_id)
+                     return {"module": "FINISHED", "response": response}
+
+                # Terminer et générer l'Excel
+                response = "Enregistrement terminé.\n\nPréparation de votre fichier Excel récapitulatif des coûts fixes annualisés..."
+                processing_data = get_text_message_input(wa_id, response)
+                send_message(processing_data)
+
+                drive_url = generate_cfu_excel(wa_id, data["items_list"])
+
+                if drive_url:
+                    final_response = f"Voici le lien vers votre fichier Excel des coûts fixes annualisés : {drive_url}"
+                else:
+                    final_response = "L'enregistrement est terminé, mais une erreur est survenue lors de la création du fichier Excel."
+
+                delete_user_state(wa_id)
+                return {"module": "FINISHED", "response": final_response}
+            else:
+                response = "Veuillez répondre par 'oui' ou 'non'."
+                # Rester à l'étape ASK_MORE_ITEMS
 
     except ValueError:
-        response = "Montant invalide. Veuillez entrer un nombre (ex: 500 ou 123.45)."
-
+        if step == "ASK_COST_PER_PERIOD":
+            response = "Coût invalide. Veuillez entrer un nombre (ex: 500 ou 150.75)."
+        elif step == "ASK_PERIOD_MONTHS":
+             response = "Période invalide. Veuillez entrer un nombre entier de mois (ex: 1, 3, 12)."
+        else:
+            response = "Entrée invalide. Veuillez vérifier votre saisie."
+        # Rester à l'étape courante
     except Exception as e:
-         logging.exception(f"Erreur dans handle_message CFU pour {wa_id}: {e}")
-         response = "Désolé, une erreur est survenue."
-         delete_user_state(wa_id)
-         return {"module": "FINISHED", "response": response + "\n\nRetour au menu principal."}
+        logging.exception(f"Erreur inattendue dans handle_message CFU ({step}) pour {wa_id}: {e}")
+        response = "Désolé, une erreur interne est survenue."
+        delete_user_state(wa_id)
+        return {"module": "FINISHED", "response": response + "\n\nRetour au menu."}
 
     state["data"] = data
+    state["current_item"] = current_item
     state["response"] = response
-    return state # Retourner l'état pour continuer si pas fini
+    return state

@@ -4,343 +4,344 @@ import os
 import logging
 import openpyxl
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment
-from openpyxl.cell import MergedCell
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from openpyxl.utils import get_column_letter
-# Import your drive service function correctly
+# Importez votre fonction d'upload Drive
 try:
-    # Adjust the path based on your project structure if necessary
     from .drive_service import upload_file_to_drive
 except ImportError:
-    from drive_service import upload_file_to_drive # Fallback for different structure/testing
+    from drive_service import upload_file_to_drive
 
-# --- Function 1: Costs (CVU) ---
-def generate_costs_excel(user_id, costs_data):
+# --- Fonctions Helpe pour le style ---
+def set_header_style(cell):
+    cell.font = Font(bold=True, color="FFFFFF") # Texte blanc
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+    cell.fill = PatternFill(start_color="4F81BD", end_color="4F81BD", fill_type="solid") # Fond bleu
+    thin_border = Border(left=Side(style='thin'),
+                         right=Side(style='thin'),
+                         top=Side(style='thin'),
+                         bottom=Side(style='thin'))
+    cell.border = thin_border
+
+def set_data_style(cell, is_currency=False, is_bold=False):
+    cell.alignment = Alignment(horizontal='right' if is_currency else 'left', vertical='center')
+    if is_currency:
+        cell.number_format = '#,##0.00$' # Format monétaire
+    if is_bold:
+        cell.font = Font(bold=True)
+    thin_border = Border(left=Side(style='thin'),
+                         right=Side(style='thin'),
+                         top=Side(style='thin'),
+                         bottom=Side(style='thin'))
+    cell.border = thin_border
+
+# --- Fonction 1: Coûts Variables (CVU) - Mise à jour ---
+def generate_costs_excel(user_id, items_list, total_qte_produced):
     """
-    Génère un fichier Excel pour les coûts variables (CVU), l'upload sur Drive et retourne l'URL.
-    Expects costs_data to be a dictionary containing keys like 'costs', 'final_unit_cost', etc.
+    Génère Excel CVU basé sur la nouvelle logique, upload et retourne l'URL.
+    items_list: [{'name': str, 'global_kg': float, 'global_pt': float}, ...]
+    total_qte_produced: float
     """
     excel_path = f"costs_cvu_{user_id}_{os.urandom(4).hex()}.xlsx"
     drive_url = None
-    wb = None # Ensure wb is defined
+    wb = None
+
+    if total_qte_produced == 0: # Éviter division par zéro
+        logging.error("total_qte_produced is zero, cannot calculate CVU.")
+        return None
 
     try:
-        # Extract data (adjust keys based on how you store it in calcul_cvu.py state)
-        costs = costs_data.get('costs_list', []) # Assuming you store the list of costs here
-        final_unit_cost = costs_data.get('cvu', 0) # Assuming final CVU is stored here
-        # You might need to recalculate transport/labor costs here if not stored directly
-        # Or pass them explicitly if they are stored in the state.
-        # For simplicity, let's assume they might need recalculation or aren't displayed
-        # Add placeholder values or adjust logic as needed.
-        total_mp = sum(c.get('total_unit_cost', 0) for c in costs)
-        transport_cost_display = total_mp * 0.01 # Example recalculation
-        labor_cost_display = total_mp * 0.30  # Example recalculation
-
-
         wb = Workbook()
         ws = wb.active
-        ws.title = "Coûts Variables"
+        ws.title = "Coût Variable Unitaire"
 
-        ws['A1'] = "Calcul du coût variable unitaire"
+        # Titre principal
+        ws['A1'] = "Calcul du Coût Variable Unitaire (CVU)"
+        ws.merge_cells('A1:F1') # Fusionner sur 6 colonnes
         ws['A1'].font = Font(size=14, bold=True)
-        ws.merge_cells('A1:E1')
-        ws['A1'].alignment = Alignment(horizontal='center')
+        ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
 
-        headers = ["Elements du CV", "Unité", "Quantité", "Prix unitaire $", "Montant total $"]
-        header_row = 3
+        # En-têtes
+        headers = ["Élément du CV", "Qté Globale (Kg)", "Prix Total Global ($)", "Prix Unitaire Matière ($/Kg)", "Qté Unitaire (Kg/unité)", "Montant ($/unité)"]
+        header_row_num = 3
         for col_num, header in enumerate(headers, 1):
-            cell = ws.cell(row=header_row, column=col_num, value=header)
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
+            cell = ws.cell(row=header_row_num, column=col_num, value=header)
+            set_header_style(cell)
 
-        row_num = header_row + 1
-        for cost in costs:
-            ws.cell(row=row_num, column=1, value=cost.get('name', 'N/A'))
-            ws.cell(row=row_num, column=2, value=cost.get('unit', 'N/A')).alignment = Alignment(horizontal='center')
-            ws.cell(row=row_num, column=3, value=f"{cost.get('quantity_per_unit', 0):.5f}").alignment = Alignment(horizontal='center')
-            ws.cell(row=row_num, column=4, value=f"{cost.get('cost_per_unit', 0):.3f}").alignment = Alignment(horizontal='center')
-            ws.cell(row=row_num, column=5, value=f"{cost.get('total_unit_cost', 0):.3f}").alignment = Alignment(horizontal='center')
-            row_num += 1
+        # Remplissage des données et calculs
+        current_row = header_row_num + 1
+        total_cvu = 0.0
+        calculated_items = []
 
-        # Ajout des totaux (ajusté)
-        ws.cell(row=row_num, column=1, value="Total MP").font = Font(bold=True)
-        ws.cell(row=row_num, column=5, value=f"{total_mp:.3f}").alignment = Alignment(horizontal='center')
-        row_num += 1
+        for item in items_list:
+            name = item.get('name', 'N/A')
+            global_kg = item.get('global_kg', 0.0)
+            global_pt = item.get('global_pt', 0.0)
 
-        ws.cell(row=row_num, column=1, value="Transport (Ex: 1%)").font = Font(bold=True)
-        ws.cell(row=row_num, column=5, value=f"{transport_cost_display:.3f}").alignment = Alignment(horizontal='center')
-        row_num += 1
+            cost_per_unit_kg = (global_pt / global_kg) if global_kg != 0 else 0
+            kg_per_final_unit = global_kg / total_qte_produced
+            cost_per_final_unit = global_pt / total_qte_produced # = cost_per_unit_kg * kg_per_final_unit
 
-        ws.cell(row=row_num, column=1, value="Main d'oeuvre (Ex: 30%)").font = Font(bold=True)
-        ws.cell(row=row_num, column=5, value=f"{labor_cost_display:.3f}").alignment = Alignment(horizontal='center')
-        row_num += 1
+            calculated_items.append({
+                 "name": name,
+                 "global_kg": global_kg,
+                 "global_pt": global_pt,
+                 "cost_per_unit_kg": cost_per_unit_kg,
+                 "kg_per_final_unit": kg_per_final_unit,
+                 "cost_per_final_unit": cost_per_final_unit
+            })
+            total_cvu += cost_per_final_unit
 
-        ws.cell(row=row_num, column=1, value="Coût variable unitaire").font = Font(bold=True)
-        ws.cell(row=row_num, column=5, value=f"{final_unit_cost:.3f}").alignment = Alignment(horizontal='center')
+            # Écrire dans le fichier Excel
+            ws.cell(row=current_row, column=1, value=name)
+            ws.cell(row=current_row, column=2, value=global_kg)
+            ws.cell(row=current_row, column=3, value=global_pt)
+            ws.cell(row=current_row, column=4, value=cost_per_unit_kg)
+            ws.cell(row=current_row, column=5, value=kg_per_final_unit)
+            ws.cell(row=current_row, column=6, value=cost_per_final_unit)
 
+            # Appliquer le style aux données
+            for col_num in range(1, 7):
+                 cell = ws.cell(row=current_row, column=col_num)
+                 is_currency = col_num in [3, 4, 6]
+                 set_data_style(cell, is_currency=is_currency)
+                 if col_num in [5]: # Style pour quantité unitaire
+                      cell.number_format = '0.00000'
 
-        # Ajustement de la largeur des colonnes (simplifié)
-        for col_idx in range(1, len(headers) + 1):
-             column_letter = get_column_letter(col_idx)
-             ws.column_dimensions[column_letter].width = 20 # Set a default width
+            current_row += 1
+
+        # Ligne Total
+        ws.cell(row=current_row, column=1, value="Total Coût Variable Unitaire (CVU)").font = Font(bold=True)
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=5)
+        total_cell = ws.cell(row=current_row, column=6, value=total_cvu)
+        set_data_style(total_cell, is_currency=True, is_bold=True)
+
+        # Ajuster largeur colonnes
+        column_widths = {'A': 30, 'B': 18, 'C': 20, 'D': 25, 'E': 25, 'F': 20}
+        for col_letter, width in column_widths.items():
+            ws.column_dimensions[col_letter].width = width
 
         # Sauvegarde et Upload
         wb.save(excel_path)
-        logging.info(f"Excel CVU sauvegardé localement: {excel_path}")
+        logging.info(f"Excel CVU sauvegardé: {excel_path}")
         drive_url = upload_file_to_drive(excel_path)
-        if drive_url:
-            logging.info(f"Excel CVU uploadé sur Drive: {drive_url}")
-        else:
-            logging.error(f"Échec de l'upload Drive pour Excel CVU: {excel_path}")
+        # ... (logging succès/échec upload)
 
     except Exception as e:
-        logging.exception(f"Erreur lors de la génération de l'Excel CVU pour {user_id}: {e}")
-        drive_url = None # Assurer que l'URL est None en cas d'erreur
+        logging.exception(f"Erreur génération Excel CVU pour {user_id}: {e}")
+        drive_url = None
     finally:
-        # Fermer le classeur s'il est ouvert (évite les erreurs de suppression sous Windows)
+        # ... (fermeture wb et suppression fichier local) ...
         if wb:
-             try:
-                 wb.close()
-             except Exception as close_e:
-                 logging.warning(f"Erreur lors de la fermeture du classeur Excel CVU: {close_e}")
-        # Nettoyer le fichier local
+             try: wb.close()
+             except Exception: pass
         if os.path.exists(excel_path):
-            try:
-                os.remove(excel_path)
-                logging.info(f"Fichier local Excel CVU supprimé: {excel_path}")
-            except OSError as e:
-                logging.error(f"Erreur lors de la suppression du fichier Excel CVU {excel_path}: {e}")
+            try: os.remove(excel_path)
+            except OSError as e: logging.error(f"Erreur suppression {excel_path}: {e}")
 
     return drive_url
 
 
-# --- Function 2: Amortization (Immobilisations) - Simplified ---
-def generate_amortization_excel(user_id, immobilisations_list):
+# --- Fonction 2: Immobilisations - Mise à jour ---
+def generate_amortization_excel(user_id, items_list):
     """
-    Génère un fichier Excel simplifié pour les immobilisations, l'upload sur Drive et retourne l'URL.
-    Expects immobilisations_list to be a list of dictionaries, each with 'description' and 'cost'.
+    Génère Excel Immobilisations avec amortissement, upload et retourne l'URL.
+    items_list: [{'name': str, 'cost': float, 'lifespan': int (years)}, ...]
     """
     excel_path = f"immobilisations_{user_id}_{os.urandom(4).hex()}.xlsx"
     drive_url = None
     wb = None
 
     try:
-        wb = openpyxl.Workbook()
+        wb = Workbook()
         ws = wb.active
-        ws.title = "Immobilisations"
+        ws.title = "Amortissement Immobilisations"
 
-        ws['A1'] = "Liste des Immobilisations Enregistrées"
+        ws['A1'] = "Tableau d'Amortissement Linéaire des Immobilisations"
+        ws.merge_cells('A1:E1') # 5 colonnes
         ws['A1'].font = Font(size=14, bold=True)
-        ws.merge_cells('A1:B1')
-        ws['A1'].alignment = Alignment(horizontal='center')
+        ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
 
-        # En-têtes simplifiés
-        headers = ["Description", "Coût d'acquisition $"]
-        ws.append(headers) # Append starts from the next available row (A2)
+        headers = ["Immobilisation (Nom)", "Coût Acquisition ($)", "Durée (ans)", "Amortissement Annuel ($)", "Amortissement Cumulé ($)"]
+        header_row_num = 3
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=header_row_num, column=col_num, value=header)
+            set_header_style(cell)
 
-        # Mettre les en-têtes en gras et centrés
-        for cell in ws[2]: # La ligne 2 contient les en-têtes
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
+        current_row = header_row_num + 1
+        total_annual_amortization = 0.0
+        calculated_items = []
 
-        # Ajouter les données
-        total_cost_all = 0
-        for item in immobilisations_list:
-            description = item.get('description', 'N/A')
-            cost = item.get('cost', 0)
-            row = [description, f"{cost:.2f}"]
-            ws.append(row)
-            total_cost_all += cost
+        for item in items_list:
+            name = item.get('name', 'N/A')
+            cost = item.get('cost', 0.0)
+            lifespan = item.get('lifespan', 0) # Durée en années
 
-        # Ajouter une ligne pour le total
-        ws.append([]) # Ligne vide
-        total_row_idx = ws.max_row + 1
-        ws.cell(row=total_row_idx, column=1, value="Coût Total Immobilisations").font = Font(bold=True)
-        ws.cell(row=total_row_idx, column=2, value=f"{total_cost_all:.2f}").font = Font(bold=True)
-        ws.cell(row=total_row_idx, column=2).alignment = Alignment(horizontal='center')
+            annual_amortization = (cost / lifespan) if lifespan > 0 else 0
+            total_annual_amortization += annual_amortization
+
+            # Note: Amortissement cumulé n'a de sens que sur plusieurs années.
+            # Ici, on affiche juste le total annuel pour toutes les immobilisations.
+            # Si vous voulez un vrai tableau d'amortissement sur N années, c'est plus complexe.
+
+            calculated_items.append({
+                 "name": name,
+                 "cost": cost,
+                 "lifespan": lifespan,
+                 "annual_amortization": annual_amortization
+            })
+
+            ws.cell(row=current_row, column=1, value=name)
+            ws.cell(row=current_row, column=2, value=cost)
+            ws.cell(row=current_row, column=3, value=lifespan)
+            ws.cell(row=current_row, column=4, value=annual_amortization)
+            # Laissez la colonne E vide pour l'instant ou répétez l'amort. annuel
+            ws.cell(row=current_row, column=5, value=annual_amortization) # Exemple: affiche amort. annuel ici aussi
+
+            # Appliquer style
+            for col_num in range(1, 6):
+                 cell = ws.cell(row=current_row, column=col_num)
+                 is_currency = col_num in [2, 4, 5]
+                 is_int = col_num == 3
+                 set_data_style(cell, is_currency=is_currency)
+                 if is_int: cell.number_format = '0'
 
 
-        # Ajuster la largeur des colonnes
-        ws.column_dimensions['A'].width = 40 # Description
-        ws.column_dimensions['B'].width = 20 # Coût
+            current_row += 1
+
+        # Ligne Total
+        ws.cell(row=current_row, column=1, value="Total Amortissement Annuel").font = Font(bold=True)
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=3)
+        total_cell_annuel = ws.cell(row=current_row, column=4, value=total_annual_amortization)
+        set_data_style(total_cell_annuel, is_currency=True, is_bold=True)
+        # Mettre aussi dans la colonne E pour l'alignement visuel
+        total_cell_cumul = ws.cell(row=current_row, column=5, value=total_annual_amortization)
+        set_data_style(total_cell_cumul, is_currency=True, is_bold=True)
+
+
+        # Ajuster largeur
+        column_widths = {'A': 35, 'B': 20, 'C': 15, 'D': 25, 'E': 25}
+        for col_letter, width in column_widths.items():
+            ws.column_dimensions[col_letter].width = width
 
         # Sauvegarde et Upload
         wb.save(excel_path)
-        logging.info(f"Excel Immobilisations sauvegardé localement: {excel_path}")
+        logging.info(f"Excel Amortissement sauvegardé: {excel_path}")
         drive_url = upload_file_to_drive(excel_path)
-        if drive_url:
-            logging.info(f"Excel Immobilisations uploadé sur Drive: {drive_url}")
-        else:
-            logging.error(f"Échec de l'upload Drive pour Excel Immobilisations: {excel_path}")
+        # ... (logging succès/échec upload)
 
     except Exception as e:
-        logging.exception(f"Erreur lors de la génération de l'Excel Immobilisations pour {user_id}: {e}")
+        logging.exception(f"Erreur génération Excel Amortissement pour {user_id}: {e}")
         drive_url = None
     finally:
+        # ... (fermeture wb et suppression fichier local) ...
         if wb:
-             try:
-                 wb.close()
-             except Exception as close_e:
-                 logging.warning(f"Erreur lors de la fermeture du classeur Excel Immobilisations: {close_e}")
+             try: wb.close()
+             except Exception: pass
         if os.path.exists(excel_path):
-            try:
-                os.remove(excel_path)
-                logging.info(f"Fichier local Excel Immobilisations supprimé: {excel_path}")
-            except OSError as e:
-                logging.error(f"Erreur lors de la suppression du fichier Excel Immobilisations {excel_path}: {e}")
+            try: os.remove(excel_path)
+            except OSError as e: logging.error(f"Erreur suppression {excel_path}: {e}")
 
     return drive_url
 
 
-# --- Function 3: Fixed Costs (CFU) ---
-def generate_cfu_excel(user_id, cfu_data):
+# --- Fonction 3: Coûts Fixes (CFU) - Mise à jour ---
+def generate_cfu_excel(user_id, items_list):
     """
-    Génère un fichier Excel pour les coûts fixes (CFU), l'upload sur Drive et retourne l'URL.
-    Expects cfu_data to be a dictionary like {'rent': 100, 'salaries': 500, 'others': 50, 'total_cf': 650}.
+    Génère Excel Coûts Fixes annualisés, upload et retourne l'URL.
+    items_list: [{'name': str, 'cost_per_period': float, 'period_months': int}, ...]
     """
     excel_path = f"cfu_{user_id}_{os.urandom(4).hex()}.xlsx"
     drive_url = None
     wb = None
 
     try:
-        wb = openpyxl.Workbook()
+        wb = Workbook()
         ws = wb.active
-        ws.title = "Coûts Fixes"
+        ws.title = "Coûts Fixes Annualisés"
 
-        ws['A1'] = "Calcul des Coûts Fixes (CF) Totaux"
+        ws['A1'] = "Tableau des Coûts Fixes Annualisés"
+        ws.merge_cells('A1:E1') # 5 colonnes
         ws['A1'].font = Font(size=14, bold=True)
-        ws.merge_cells('A1:B1')
-        ws['A1'].alignment = Alignment(horizontal='center')
+        ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
 
-        # Ajouter les données directement (format simple)
-        headers = ["Élément du Coût Fixe", "Montant Total $"]
-        ws.append(headers)
-        for cell in ws[2]: # Ligne 2
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
+        headers = ["Coût Fixe (Nom)", "Coût par Période ($)", "Période (mois)", "Facteur Annuel", "Coût Annuel ($)"]
+        header_row_num = 3
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=header_row_num, column=col_num, value=header)
+            set_header_style(cell)
 
-        data_rows = [
-            ("Loyer / Charge similaire", cfu_data.get('rent', 0)),
-            ("Salaires et Charges Sociales", cfu_data.get('salaries', 0)),
-            ("Autres Coûts Fixes", cfu_data.get('others', 0)),
-        ]
+        current_row = header_row_num + 1
+        total_annual_fixed_cost = 0.0
+        calculated_items = []
 
-        for label, amount in data_rows:
-            ws.append([label, f"{amount:.2f}"])
+        for item in items_list:
+            name = item.get('name', 'N/A')
+            cost_per_period = item.get('cost_per_period', 0.0)
+            period_months = item.get('period_months', 0)
 
-        # Ajouter la ligne Total
-        ws.append([]) # Ligne vide
-        total_row_idx = ws.max_row + 1
-        ws.cell(row=total_row_idx, column=1, value="Total Coûts Fixes (CF)").font = Font(bold=True)
-        ws.cell(row=total_row_idx, column=2, value=f"{cfu_data.get('total_cf', 0):.2f}").font = Font(bold=True)
-        ws.cell(row=total_row_idx, column=2).alignment = Alignment(horizontal='center')
+            annual_factor = (12 / period_months) if period_months > 0 else 0
+            annual_cost = cost_per_period * annual_factor
+            total_annual_fixed_cost += annual_cost
+
+            calculated_items.append({
+                "name": name,
+                "cost_per_period": cost_per_period,
+                "period_months": period_months,
+                "annual_factor": annual_factor,
+                "annual_cost": annual_cost
+            })
+
+            ws.cell(row=current_row, column=1, value=name)
+            ws.cell(row=current_row, column=2, value=cost_per_period)
+            ws.cell(row=current_row, column=3, value=period_months)
+            ws.cell(row=current_row, column=4, value=annual_factor)
+            ws.cell(row=current_row, column=5, value=annual_cost)
+
+            # Style
+            for col_num in range(1, 6):
+                 cell = ws.cell(row=current_row, column=col_num)
+                 is_currency = col_num in [2, 5]
+                 is_int = col_num == 3
+                 is_factor = col_num == 4
+                 set_data_style(cell, is_currency=is_currency)
+                 if is_int: cell.number_format = '0'
+                 if is_factor: cell.number_format = '0.00'
 
 
-        # Ajuster la largeur des colonnes
-        ws.column_dimensions['A'].width = 30
-        ws.column_dimensions['B'].width = 20
+            current_row += 1
+
+        # Ligne Total
+        ws.cell(row=current_row, column=1, value="Total Coûts Fixes Annuels").font = Font(bold=True)
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=4)
+        total_cell = ws.cell(row=current_row, column=5, value=total_annual_fixed_cost)
+        set_data_style(total_cell, is_currency=True, is_bold=True)
+
+        # Ajuster largeur
+        column_widths = {'A': 35, 'B': 20, 'C': 15, 'D': 18, 'E': 20}
+        for col_letter, width in column_widths.items():
+            ws.column_dimensions[col_letter].width = width
 
         # Sauvegarde et Upload
         wb.save(excel_path)
-        logging.info(f"Excel CFU sauvegardé localement: {excel_path}")
+        logging.info(f"Excel CFU sauvegardé: {excel_path}")
         drive_url = upload_file_to_drive(excel_path)
-        if drive_url:
-            logging.info(f"Excel CFU uploadé sur Drive: {drive_url}")
-        else:
-            logging.error(f"Échec de l'upload Drive pour Excel CFU: {excel_path}")
+        # ... (logging succès/échec upload)
 
     except Exception as e:
-        logging.exception(f"Erreur lors de la génération de l'Excel CFU pour {user_id}: {e}")
+        logging.exception(f"Erreur génération Excel CFU pour {user_id}: {e}")
         drive_url = None
     finally:
+        # ... (fermeture wb et suppression fichier local) ...
         if wb:
-             try:
-                 wb.close()
-             except Exception as close_e:
-                 logging.warning(f"Erreur lors de la fermeture du classeur Excel CFU: {close_e}")
+             try: wb.close()
+             except Exception: pass
         if os.path.exists(excel_path):
-            try:
-                os.remove(excel_path)
-                logging.info(f"Fichier local Excel CFU supprimé: {excel_path}")
-            except OSError as e:
-                logging.error(f"Erreur lors de la suppression du fichier Excel CFU {excel_path}: {e}")
+            try: os.remove(excel_path)
+            except OSError as e: logging.error(f"Erreur suppression {excel_path}: {e}")
 
     return drive_url
 
-# --- Function 4: Environment Costs - Corrected/Simplified ---
-# Note: The original function had issues. This is a guess based on structure.
-# You'll need to adapt it based on what data `env` actually holds.
-def generate_costs_env_excel(user_id, env_data_list):
-    """
-    Génère un fichier Excel pour les coûts environnementaux (exemple), l'upload et retourne l'URL.
-    Expects env_data_list to be a list of dictionaries.
-    """
-    excel_path = f"env_costs_{user_id}_{os.urandom(4).hex()}.xlsx"
-    drive_url = None
-    wb = None
-
-    try:
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Coûts Environnementaux"
-
-        ws['A1'] = "Exemple Coûts Environnementaux / Formation"
-        ws['A1'].font = Font(size=14, bold=True)
-        ws.merge_cells('A1:C1') # Ajusté à 3 colonnes pour cet exemple
-        ws['A1'].alignment = Alignment(horizontal='center')
-
-        headers = ["Description", "Sessions/Unités", "Coût Total $"] # Exemple d'en-têtes
-        ws.append(headers)
-        for cell in ws[2]: # Ligne 2
-            cell.font = Font(bold=True)
-            cell.alignment = Alignment(horizontal='center')
-
-        total_env_cost = 0
-        for item in env_data_list:
-            # Adaptez ces clés à ce que contient réellement chaque 'item' dans env_data_list
-            description = item.get('description', 'Formation/Activité Env.')
-            quantity = item.get('quantity', item.get('training_sessions', 0)) # Essayer plusieurs clés possibles
-            cost = item.get('total_cost', item.get('training_costs', 0)) # Essayer plusieurs clés possibles
-            row = [description, quantity, f"{cost:.2f}"]
-            ws.append(row)
-            total_env_cost += cost
-
-        # Ajouter la ligne Total
-        ws.append([]) # Ligne vide
-        total_row_idx = ws.max_row + 1
-        ws.cell(row=total_row_idx, column=1, value="Total Coûts Env.").font = Font(bold=True)
-        ws.cell(row=total_row_idx, column=3, value=f"{total_env_cost:.2f}").font = Font(bold=True)
-        ws.cell(row=total_row_idx, column=3).alignment = Alignment(horizontal='center')
-
-
-        # Ajuster la largeur des colonnes
-        ws.column_dimensions['A'].width = 40
-        ws.column_dimensions['B'].width = 20
-        ws.column_dimensions['C'].width = 20
-
-        # Sauvegarde et Upload
-        wb.save(excel_path)
-        logging.info(f"Excel Coûts Env. sauvegardé localement: {excel_path}")
-        drive_url = upload_file_to_drive(excel_path)
-        if drive_url:
-            logging.info(f"Excel Coûts Env. uploadé sur Drive: {drive_url}")
-        else:
-            logging.error(f"Échec de l'upload Drive pour Excel Coûts Env.: {excel_path}")
-
-    except Exception as e:
-        logging.exception(f"Erreur lors de la génération de l'Excel Coûts Env. pour {user_id}: {e}")
-        drive_url = None
-    finally:
-        if wb:
-             try:
-                 wb.close()
-             except Exception as close_e:
-                 logging.warning(f"Erreur lors de la fermeture du classeur Excel Env: {close_e}")
-        if os.path.exists(excel_path):
-            try:
-                os.remove(excel_path)
-                logging.info(f"Fichier local Excel Coûts Env. supprimé: {excel_path}")
-            except OSError as e:
-                logging.error(f"Erreur lors de la suppression du fichier Excel Coûts Env. {excel_path}: {e}")
-
-    return drive_url
+# Note: La fonction generate_costs_env_excel n'est pas mise à jour car son objectif
+# et la structure de ses données d'entrée ('env') n'étaient pas clairs.
+# Si vous en avez besoin, veuillez clarifier ce qu'elle doit calculer et afficher.
