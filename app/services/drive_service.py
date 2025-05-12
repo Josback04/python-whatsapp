@@ -4,7 +4,7 @@ from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 # Charger les credentials
-CREDENTIALS_FILE = "./app/services/credentials.json"
+CREDENTIALS_FILE = "/app/services/credentials.json"
 FOLDER_ID = "1L-CYkX-iHSQwNwIVDpiZzScJg-dkhBDF"
 
 def upload_file_to_drive(file_path,):
