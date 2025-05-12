@@ -4,6 +4,8 @@ from app.questions import QUESTIONS # Importer les questions
 from app.database.database import save_response_to_db
 from app.services.gemini import ask_ai
 from app.services.docx_service import generate_docx
+from app.database.database import log_usage_event
+
 CATEGORY_ORDER = list(QUESTIONS.keys())
 
 def start_formulaire(wa_id):
@@ -96,9 +98,12 @@ def handle_message(wa_id, message_body, state):
                 # 4. Vérifier le résultat et préparer la réponse finale
                 if drive_url:
                     logging.info(f"Document généré et uploadé pour {wa_id}. URL: {drive_url}")
+                    log_usage_event(wa_id, "MODULE_COMPLETE", "FORMULAIRE_FINISHED")
+                    log_usage_event(wa_id, "FILE_GENERATED", f"DOCX_COPA: {drive_url}")
                     final_response_text = f"Votre document a été généré avec succès ! Vous pouvez le consulter ici : {drive_url}"
                 else:
                     logging.error(f"La génération/upload du document a échoué pour l'utilisateur {wa_id}.")
+                    log_usage_event(wa_id, "MODULE_ERROR", "FORMULAIRE_COPA_DOCX_FAILED")
                     final_response_text = "Désolé, une erreur est survenue lors de la création ou de la sauvegarde de votre document. Veuillez réessayer plus tard ou contacter le support."
 
             except Exception as e:

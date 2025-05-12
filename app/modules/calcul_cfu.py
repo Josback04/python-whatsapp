@@ -2,6 +2,7 @@
 import logging
 from app.services.excel_service import generate_cfu_excel
 # from app.utils.whatsapp_utils import send_message, get_text_message_input, delete_user_state
+from app.database.database import log_usage_event
 
 def start_cfu(wa_id):
     """Initialise le module CFU."""
@@ -77,8 +78,10 @@ def handle_message(wa_id, message_body, state):
 
                 if drive_url:
                     final_response = f"Voici le lien vers votre fichier Excel des coûts fixes annualisés : {drive_url}"
+                    log_usage_event(wa_id, "MODULE_COMPLETE", "CFU_FINISHED")
                 else:
                     final_response = "L'enregistrement est terminé, mais une erreur est survenue lors de la création du fichier Excel."
+                    log_usage_event(wa_id, "MODULE_FAILED", "CFU_FAILED")
 
                 delete_user_state(wa_id)
                 return {"module": "FINISHED", "response": final_response}

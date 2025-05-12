@@ -2,6 +2,8 @@
 import logging
 from app.services.excel_service import generate_costs_excel
 # from app.utils.whatsapp_utils import send_message, get_text_message_input, delete_user_state
+from app.database.database import log_usage_event
+
 
 def start_cvu(wa_id):
     """Initialise le module CVU."""
@@ -99,9 +101,11 @@ def handle_message(wa_id, message_body, state):
 
                 if drive_url:
                     final_response = f"Voici le lien vers votre fichier Excel de calcul du CVU : {drive_url}"
+                    log_usage_event(wa_id, "MODULE_COMPLETE", "CVU_FINISHED")
                 else:
                     final_response = ("Le calcul est terminé, mais une erreur est survenue lors de la création du fichier Excel. "
                                       "Vérifiez notamment que la quantité produite n'est pas nulle.")
+                    log_usage_event(wa_id, "MODULE_FAILED", "CVU_FAILED")
 
                 delete_user_state(wa_id)
                 return {"module": "FINISHED", "response": final_response}

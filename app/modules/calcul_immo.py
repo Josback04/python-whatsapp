@@ -1,6 +1,8 @@
 # app/modules/calcul_immo.py
 import logging
 from app.services.excel_service import generate_amortization_excel
+from app.database.database import log_usage_event
+
 # from app.utils.whatsapp_utils import send_message, get_text_message_input, delete_user_state
 
 def start_immos(wa_id):
@@ -89,9 +91,10 @@ def handle_message(wa_id, message_body, state):
 
                 if drive_url:
                     final_response = f"Voici le lien vers votre fichier Excel des immobilisations : {drive_url}"
+                    log_usage_event(wa_id, "MODULE_COMPLETED", "IMMO_FINISHED")
                 else:
                     final_response = "L'enregistrement est terminé, mais une erreur est survenue lors de la création du fichier Excel."
-
+                    log_usage_event(wa_id, "MODULE_ERROR", "IMMO_FAILED")
                 delete_user_state(wa_id)
                 return {"module": "FINISHED", "response": final_response}
             else:

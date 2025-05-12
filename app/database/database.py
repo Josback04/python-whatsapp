@@ -123,3 +123,37 @@ def save_response_to_db(wa_id, question_text, answer_text):
 
 
 
+def log_usage_event(wa_id, event_type, event_details=None):
+    """Enregistre un événement d'utilisation dans la base de données."""
+    # S'assurer que l'utilisateur existe est une bonne pratique,
+    # mais si l'événement ne dépend pas strictement d'un utilisateur existant
+    # ou si l'utilisateur est créé juste avant/après, cela peut être optionnel ici.
+    # Pour la cohérence, on peut appeler ensure_user_exists.
+    if not ensure_user_exists(wa_id): # Tentera de créer l'utilisateur s'il n'existe pas
+         logging.warning(f"L'utilisateur {wa_id} n'a pas pu être assuré/créé pour log_usage_event, mais l'événement sera quand même loggué.")
+
+    conn = get_db_connection()
+    if not conn:
+        logging.error("Échec de la connexion DB pour log_usage_event.")
+        return False
+
+    cursor = None
+    try:
+        cursor = conn.cursor()
+        query = """
+            INSERT INTO stats_events (user_wa_id, event_type, event_details, timestamp)
+            VALUES (%s, %s, %s, %s)
+        """
+        current_time = datetime.datetime.now()
+        cursor.execute(query, (wa_id, event_type, event_details, current_time))
+        conn.commit()
+        logging.info(f"Événement d'utilisation loggué pour {wa_id}: {event_type} - {event_details}")
+        return True
+    except Error as e:
+        logging.error(f"Erreur DB lors de log_usage_event pour {wa_id}: {e}")
+        return False
+    finally:
+        if cursor:
+            cursor.close()
+        if conn and conn.is_connected():
+            conn.close()

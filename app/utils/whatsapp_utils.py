@@ -6,6 +6,7 @@ import redis
 from app.questions import QUESTIONS
 from app.config import redis_client
 from app.modules import formulaire, calcul_cvu, calcul_cfu, calcul_immo
+from app.database.database import log_usage_event
 
 # from app.services.openai_service import generate_response
 import re 
@@ -201,15 +202,19 @@ def process_whatsapp_message(body):
         elif current_module is None or current_module == "MENU":
             if message_body == "1":
                 new_state = formulaire.start_formulaire(wa_id)
+                log_usage_event(wa_id, "MODULE_START", "FORMULAIRE_COPA")
                 response_text = new_state.get("response")
             elif message_body == "2":
                 new_state = calcul_cvu.start_cvu(wa_id)
+                log_usage_event(wa_id, "MODULE_START", "CALCUL_CVU")
                 response_text = new_state.get("response")
             elif message_body == "3":
                  new_state = calcul_cfu.start_cfu(wa_id)
+                 log_usage_event(wa_id, "MODULE_START", "CALCUL_CFU")
                  response_text = new_state.get("response")
             elif message_body == "4":
                  new_state = calcul_immo.start_immos(wa_id)
+                 log_usage_event(wa_id, "MODULE_START", "CALCUL_IMMO")
                  response_text = new_state.get("response")
             else:
                 # Si ce n'est pas la première interaction (current_module == "MENU")
