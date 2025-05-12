@@ -28,7 +28,7 @@ def start_formulaire(wa_id):
 def handle_message(wa_id, message_body, state):
     """Gère un message lorsque l'utilisateur est dans le module formulaire."""
 
-    from app.utils.whatsapp_utils import send_document_message, send_message, get_text_message_input, delete_user_state
+    from app.utils.whatsapp_utils import  send_message, get_text_message_input, delete_user_state
 
     logging.info(f"Traitement FORMULAIRE pour {wa_id}: {message_body}")
     
@@ -76,30 +76,10 @@ def handle_message(wa_id, message_body, state):
                 
                 # Generate and upload the document
                 # Pass a filename to be shown to the user
-                doc_filename = f"Candidature_COPA_{wa_id}.docx" 
-                media_id = generate_docx(wa_id, ai_response, doc_filename)
+                doc_filename = f"PLAN_AFFAIRE_{wa_id}.docx" 
+                generate_docx(doc_filename, ai_response)
 
-                if media_id:
-                    # Send the document using the media ID
-                    caption_text = "Voici votre document de candidature généré."
-                    if send_document_message(wa_id, media_id, caption=caption_text, filename=doc_filename):
-                        logging.info(f"Document successfully sent to {wa_id}")
-                        # Final state can be FINISHED or back to MENU
-                        # We don't need to send another text message here as the document is sent.
-                        delete_user_state(wa_id) # Or set to MENU
-                        return {"module": "FINISHED", "response": None} # Indicate finished, no further text needed now
-                    else:
-                        # Handle document sending failure
-                        error_response = "J'ai pu générer le document, mais une erreur est survenue lors de l'envoi. Veuillez réessayer plus tard."
-                        error_data = get_text_message_input(wa_id, error_response)
-                        send_message(error_data)
-                        state = {"module": "FINISHED", "response": None} # End interaction
-                else:
-                    # Handle document generation/upload failure
-                    error_response = "Désolé, une erreur est survenue lors de la création de votre document. Veuillez réessayer plus tard."
-                    error_data = get_text_message_input(wa_id, error_response)
-                    send_message(error_data)
-                    state = {"module": "FINISHED", "response": None} # End interaction
+               
 
             except Exception as e:
                 logging.exception(f"Error during final document generation/sending for {wa_id}: {e}")

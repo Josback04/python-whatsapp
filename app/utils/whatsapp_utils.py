@@ -122,49 +122,6 @@ def delete_user_state(wa_id):
 
 # Add this function to app/utils/whatsapp_utils.py
 
-def send_document_message(recipient_id, media_id, caption=None, filename="document.docx"):
-    """Sends a document message using a media ID."""
-    
-    json_data = {
-        "messaging_product": "whatsapp",
-        "recipient_type": "individual",
-        "to": recipient_id,
-        "type": "document",
-        "document": {
-            "id": media_id,
-            "filename": filename, # Provide a filename for the user
-        }
-    }
-    # Add caption if provided
-    if caption:
-        json_data["document"]["caption"] = caption
-
-    data = json.dumps(json_data) # Convert dict to JSON string
-    
-    # Use your existing send_message infrastructure or call directly
-    headers = {
-        "Content-type": "application/json",
-        "Authorization": f"Bearer {current_app.config['ACCESS_TOKEN']}",
-    }
-    url = f"https://graph.facebook.com/{current_app.config['VERSION']}/{current_app.config['PHONE_NUMBER_ID']}/messages"
-
-    try:
-        response = requests.post(url, data=data, headers=headers, timeout=10)
-        response.raise_for_status()
-        log_http_response(response) # Use your existing logging
-        logging.info(f"Document message sent successfully to {recipient_id}")
-        return True
-    except requests.Timeout:
-        logging.error(f"Timeout occurred while sending document message to {recipient_id}")
-        return False
-    except requests.RequestException as e:
-        logging.error(f"Request failed sending document to {recipient_id}: {e}")
-        log_http_response(e.response) # Log error response if available
-        return False
-    except Exception as e:
-         logging.error(f"Unexpected error sending document to {recipient_id}: {e}")
-         return False
-
 
 def process_text_for_whatsapp(text):
     # Remove brackets
