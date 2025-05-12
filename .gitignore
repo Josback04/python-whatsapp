@@ -45,3 +45,4 @@ test_output/
 .DS_Store  (macOS)
 Thumbs.db  (Windows)
 app/services/drive_service.py
+.DS_Store
