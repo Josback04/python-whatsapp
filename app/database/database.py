@@ -1,7 +1,7 @@
-import mysql.connector # Importer le connecteur
-from mysql.connector import Error # Pour la gestion d'erreurs DB
-from flask import current_app # Pour accéder à la config (DB credentials)
-import datetime # Pour le timestamp created_at
+import mysql.connector 
+from mysql.connector import Error 
+from flask import current_app 
+import datetime 
 from app.config import logging
 
 def get_db_connection():
@@ -39,7 +39,7 @@ def ensure_user_exists(wa_id):
                 INSERT INTO users (user_id, created_at)
                 VALUES (%s, %s)
             """
-            # Note: username est laissé NULL par défaut si la colonne l'autorise
+            # Note: username est laissé NULL par défaut vu que la colonne l'autorise
             current_time = datetime.datetime.now()
             cursor.execute(query_insert, (wa_id, current_time))
             conn.commit()
@@ -62,7 +62,7 @@ def get_user_data(user_id):
     """Récupère les questions et réponses d'un utilisateur depuis la table 'responses'."""
     conn = get_db_connection()
     if not conn:
-        return None  # Indiquer une erreur de connexion
+        return None  
 
     cursor = None
     user_data = None
@@ -105,7 +105,7 @@ def save_response_to_db(wa_id, question_text, answer_text):
             VALUES (%s, %s, %s, %s)
         """
         current_time = datetime.datetime.now()
-        # Assurez-vous que wa_id est bien un entier si nécessaire, mais BIGINT accepte de grands nombres.
+        # Assures toi que wa_id est bien un entier si nécessaire, mais BIGINT accepte de grands nombres.
         # Le connecteur gère souvent bien les types Python -> SQL.
         cursor.execute(query, (wa_id, question_text, answer_text, current_time))
         conn.commit()
