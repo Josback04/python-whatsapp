@@ -269,16 +269,38 @@ def process_whatsapp_message(body):
         # Router vers le module actif
         elif current_module == "FORMULAIRE":
             new_state = formulaire.handle_message(wa_id, message_body, user_state)
-            response_text = new_state.get("response")
+            if new_state is None:
+                logging.info(f"formulaire.handle_message returned None for user {wa_id}. Resetting state.")
+                response_text="une erreur est survenue. Veuillez réessayer."
+                new_state = {"module": "MENU"}
+            else:
+                response_text = new_state.get("response")
         elif current_module == "CVU":
             new_state = calcul_cvu.handle_message(wa_id, message_body, user_state)
-            response_text = new_state.get("response")
+            if new_state is None:
+                logging.info(f"formulaire.handle_message returned None for user {wa_id}. Resetting state.")
+                response_text="une erreur est survenue. Veuillez réessayer."
+                new_state = {"module": "MENU"}
+            else:
+                response_text = new_state.get("response")
+
         elif current_module == "CFU":
-             new_state = calcul_cfu.handle_message(wa_id, message_body, user_state)
+            new_state = calcul_cfu.handle_message(wa_id, message_body, user_state)
+            if new_state is None:
+                logging.info(f"formulaire.handle_message returned None for user {wa_id}. Resetting state.")
+                response_text="une erreur est survenue. Veuillez réessayer."
+                new_state = {"module": "MENU"}
+            else:
              response_text = new_state.get("response")
+
         elif current_module == "IMMOS":
-             new_state = calcul_immo.handle_message(wa_id, message_body, user_state)
-             response_text = new_state.get("response")
+            new_state = calcul_immo.handle_message(wa_id, message_body, user_state)
+            if new_state is None:
+                logging.info(f"formulaire.handle_message returned None for user {wa_id}. Resetting state.")
+                response_text="une erreur est survenue. Veuillez réessayer."
+                new_state = {"module": "MENU"}
+            else:
+                response_text = new_state.get("response")
         
         elif current_module == "ERROR": # Gérer l'état d'erreur Redis précédent
             response_text = user_state.get("message", "Une erreur est survenue.")
