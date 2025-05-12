@@ -54,3 +54,4 @@ flask
 redis
 gunicorn 
 python-docx
+openpyxl>=3.0.0

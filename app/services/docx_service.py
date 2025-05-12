@@ -17,7 +17,7 @@ def generate_docx(user_name, ai_response):
     # Utiliser un nom de fichier temporaire ou spécifique
     # Il est préférable de le créer dans un dossier temporaire si possible, 
     # mais pour la simplicité, on le met dans le répertoire courant.
-    file_name = f"{user_name}_recommendation_{os.urandom(4).hex()}.docx" 
+    file_name = f"{user_name}_plan_daffaire_{os.urandom(4).hex()}.docx" 
     file_path = os.path.join(file_name) # Chemin complet du fichier local temporaire
     
     logging.info(f"Génération du document local : {file_path}")
