@@ -4,6 +4,7 @@ from app.questions import QUESTIONS # Importer les questions
 from app.database.database import save_response_to_db
 from app.services.gemini import ask_ai
 from app.services.docx_service import generate_docx
+from app.utils.whatsapp_utils import send_document_message, send_message, get_text_message_input, delete_user_state
 CATEGORY_ORDER = list(QUESTIONS.keys())
 
 def start_formulaire(wa_id):
@@ -62,26 +63,48 @@ def handle_message(wa_id, message_body, state):
         if category_index >= len(CATEGORY_ORDER):
             # Fin du formulaire
             response = "Merci d'avoir répondu à toutes les questions du formulaire ! 😊"
-            
-
-
             # Indiquer la fin pour que le routeur supprime l'état
 
-            state = {"module": "FINISHED", "response": response} 
-            ai_response=ask_ai(wa_id)
-            generate_docx(wa_id,ai_response)
+            state = {"module": "FINISHED", "response": response}
 
-            return state
-        else:
-            current_category = CATEGORY_ORDER[category_index]
-            response = QUESTIONS[current_category][question_index]
-            state["category_index"] = category_index
-            state["question_index"] = question_index
-            state["response"] = response
-            return state
-    else:
-        # Question suivante dans la même catégorie
-        response = QUESTIONS[current_category][question_index]
-        state["question_index"] = question_index
-        state["response"] = response
-        return state
+            # Send generating message first
+            try:
+            # Call AI (as before)
+                ai_response = ask_ai(wa_id)
+                
+                # Generate and upload the document
+                # Pass a filename to be shown to the user
+                doc_filename = f"Candidature_COPA_{wa_id}.docx" 
+                media_id = generate_docx(wa_id, ai_response, doc_filename)
+
+                if media_id:
+                    # Send the document using the media ID
+                    caption_text = "Voici votre document de candidature généré."
+                    if send_document_message(wa_id, media_id, caption=caption_text, filename=doc_filename):
+                        logging.info(f"Document successfully sent to {wa_id}")
+                        # Final state can be FINISHED or back to MENU
+                        # We don't need to send another text message here as the document is sent.
+                        delete_user_state(wa_id) # Or set to MENU
+                        return {"module": "FINISHED", "response": None} # Indicate finished, no further text needed now
+                    else:
+                        # Handle document sending failure
+                        error_response = "J'ai pu générer le document, mais une erreur est survenue lors de l'envoi. Veuillez réessayer plus tard."
+                        error_data = get_text_message_input(wa_id, error_response)
+                        send_message(error_data)
+                        state = {"module": "FINISHED", "response": None} # End interaction
+                else:
+                    # Handle document generation/upload failure
+                    error_response = "Désolé, une erreur est survenue lors de la création de votre document. Veuillez réessayer plus tard."
+                    error_data = get_text_message_input(wa_id, error_response)
+                    send_message(error_data)
+                    state = {"module": "FINISHED", "response": None} # End interaction
+
+            except Exception as e:
+                logging.exception(f"Error during final document generation/sending for {wa_id}: {e}")
+                # Send generic error message
+                error_response = "Une erreur inattendue s'est produite. Veuillez réessayer."
+                error_data = get_text_message_input(wa_id, error_response)
+                send_message(error_data)
+                state = {"module": "FINISHED", "response": None} # End interaction
+        
+        return state # Return the final state
