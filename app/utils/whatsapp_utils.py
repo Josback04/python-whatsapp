@@ -272,6 +272,7 @@ def process_whatsapp_message(body):
             if new_state is None:
                 logging.info(f"formulaire.handle_message returned None for user {wa_id}. Resetting state.")
                 response_text="une erreur est survenue. Veuillez réessayer."
+                delete_user_state(wa_id)
                 new_state = {"module": "MENU"}
             else:
                 response_text = new_state.get("response")
@@ -281,6 +282,8 @@ def process_whatsapp_message(body):
                 logging.info(f"formulaire.handle_message returned None for user {wa_id}. Resetting state.")
                 response_text="une erreur est survenue. Veuillez réessayer."
                 new_state = {"module": "MENU"}
+                delete_user_state(wa_id)
+
             else:
                 response_text = new_state.get("response")
 
@@ -290,6 +293,7 @@ def process_whatsapp_message(body):
                 logging.info(f"formulaire.handle_message returned None for user {wa_id}. Resetting state.")
                 response_text="une erreur est survenue. Veuillez réessayer."
                 new_state = {"module": "MENU"}
+                delete_user_state(wa_id)
             else:
              response_text = new_state.get("response")
 
@@ -299,6 +303,7 @@ def process_whatsapp_message(body):
                 logging.info(f"formulaire.handle_message returned None for user {wa_id}. Resetting state.")
                 response_text="une erreur est survenue. Veuillez réessayer."
                 new_state = {"module": "MENU"}
+                delete_user_state(wa_id)
             else:
                 response_text = new_state.get("response")
         
