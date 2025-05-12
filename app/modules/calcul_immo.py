@@ -42,6 +42,17 @@ def handle_message(wa_id, message_body, state):
                 response = f"Coût : {cost:.2f}$.\nQuelle est sa durée de vie utile en années (ex: 5) ?"
                 state["step"] = "ASK_LIFESPAN"
 
+        elif step == "ASK_QUANTITY": # <--- Nouvelle étape pour la quantité
+            quantity = int(message_body)
+            if quantity <= 0:
+                response = "La quantité doit être un nombre entier positif (au moins 1). Veuillez corriger."
+                # Rester à l'étape ASK_QUANTITY
+            else:
+                current_item["quantity"] = quantity
+                # Demander la DURÉE DE VIE
+                response = f"Quantité : {quantity}.\nQuelle est la durée de vie utile en années pour cet actif (ex: 3, 5, 7) ?"
+                state["step"] = "ASK_LIFESPAN" # Passer à la durée de vie
+
         elif step == "ASK_LIFESPAN":
             lifespan = int(message_body)
             if lifespan <= 0:
@@ -89,17 +100,20 @@ def handle_message(wa_id, message_body, state):
 
     except ValueError:
         if step == "ASK_COST":
-            response = "Coût invalide. Veuillez entrer un nombre (ex: 1500.50)."
+            response = "Coût unitaire invalide. Veuillez entrer un nombre (ex: 1500.50)."
+        elif step == "ASK_QUANTITY":
+            response = "Quantité invalide. Veuillez entrer un nombre entier positif (ex: 1, 5, 10)." # Message d'erreur mis à jour
         elif step == "ASK_LIFESPAN":
-            response = "Durée invalide. Veuillez entrer un nombre entier d'années (ex: 5)."
+            response = "Durée invalide. Veuillez entrer un nombre entier positif d'années (ex: 5)."
         else:
             response = "Entrée invalide. Veuillez vérifier votre saisie."
-        # Rester à l'étape courante pour redemander
+        # Rester à l'étape courante pour redemander la saisie
     except Exception as e:
         logging.exception(f"Erreur inattendue dans handle_message IMMOS ({step}) pour {wa_id}: {e}")
         response = "Désolé, une erreur interne est survenue."
         delete_user_state(wa_id) # Nettoyer en cas d'erreur grave
         return {"module": "FINISHED", "response": response + "\n\nRetour au menu."}
+
 
     # Mettre à jour l'état avant de retourner (si pas terminé)
     state["data"] = data

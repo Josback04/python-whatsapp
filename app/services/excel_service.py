@@ -145,8 +145,8 @@ def generate_costs_excel(user_id, items_list, total_qte_produced):
 # --- Fonction 2: Immobilisations - Mise à jour ---
 def generate_amortization_excel(user_id, items_list):
     """
-    Génère Excel Immobilisations avec amortissement, upload et retourne l'URL.
-    items_list: [{'name': str, 'cost': float, 'lifespan': int (years)}, ...]
+    Génère Excel Immobilisations avec quantité, coût total et amortissement, upload et retourne l'URL.
+    items_list: [{'name': str, 'unit_cost': float, 'quantity': int, 'lifespan': int}, ...]
     """
     excel_path = f"immobilisations_{user_id}_{os.urandom(4).hex()}.xlsx"
     drive_url = None
@@ -157,70 +157,72 @@ def generate_amortization_excel(user_id, items_list):
         ws = wb.active
         ws.title = "Amortissement Immobilisations"
 
-        ws['A1'] = "Tableau d'Amortissement Linéaire des Immobilisations"
-        ws.merge_cells('A1:E1') # 5 colonnes
+        ws['A1'] = "Tableau des Immobilisations"
+        ws.merge_cells('A1:G1') # 7 colonnes maintenant
         ws['A1'].font = Font(size=14, bold=True)
         ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
 
-        headers = ["Immobilisation (Nom)", "Coût Acquisition ($)", "Durée (ans)", "Amortissement Annuel ($)", "Amortissement Cumulé ($)"]
+        # En-têtes mis à jour
+        headers = ["Immobilisation", "Qté", "Prix Unitaire ($)", "Montant Total ($)", "Durée (ans)", "Amort. Annuel ($)", "Amort. Annuel TOTAL ($)"]
         header_row_num = 3
         for col_num, header in enumerate(headers, 1):
             cell = ws.cell(row=header_row_num, column=col_num, value=header)
-            set_header_style(cell)
+            set_header_style(cell) # Utiliser la fonction de style
 
         current_row = header_row_num + 1
-        total_annual_amortization = 0.0
-        calculated_items = []
+        total_annual_amortization_all_items = 0.0
+        grand_total_cost = 0.0
 
         for item in items_list:
             name = item.get('name', 'N/A')
-            cost = item.get('cost', 0.0)
-            lifespan = item.get('lifespan', 0) # Durée en années
+            quantity = item.get('quantity', 0) # Obtenir la quantité
+            unit_cost = item.get('unit_cost', 0.0) # Obtenir le coût unitaire
+            lifespan = item.get('lifespan', 0)
 
-            annual_amortization = (cost / lifespan) if lifespan > 0 else 0
-            total_annual_amortization += annual_amortization
+            # Calculer le coût total et l'amortissement pour cet item
+            total_cost_item = unit_cost * quantity
+            annual_amortization_item = (total_cost_item / lifespan) if lifespan > 0 else 0
 
-            # Note: Amortissement cumulé n'a de sens que sur plusieurs années.
-            # Ici, on affiche juste le total annuel pour toutes les immobilisations.
-            # Si vous voulez un vrai tableau d'amortissement sur N années, c'est plus complexe.
+            # Mettre à jour les totaux généraux
+            total_annual_amortization_all_items += annual_amortization_item
+            grand_total_cost += total_cost_item
 
-            calculated_items.append({
-                 "name": name,
-                 "cost": cost,
-                 "lifespan": lifespan,
-                 "annual_amortization": annual_amortization
-            })
-
+            # Écrire les données dans la ligne
             ws.cell(row=current_row, column=1, value=name)
-            ws.cell(row=current_row, column=2, value=cost)
-            ws.cell(row=current_row, column=3, value=lifespan)
-            ws.cell(row=current_row, column=4, value=annual_amortization)
-            # Laissez la colonne E vide pour l'instant ou répétez l'amort. annuel
-            ws.cell(row=current_row, column=5, value=annual_amortization) # Exemple: affiche amort. annuel ici aussi
+            ws.cell(row=current_row, column=2, value=quantity)          # Colonne Quantité
+            ws.cell(row=current_row, column=3, value=unit_cost)         # Colonne Prix Unitaire
+            ws.cell(row=current_row, column=4, value=total_cost_item)   # Colonne Montant Total
+            ws.cell(row=current_row, column=5, value=lifespan)          # Colonne Durée
+            ws.cell(row=current_row, column=6, value=annual_amortization_item) # Colonne Amort. Annuel
+            ws.cell(row=current_row, column=7, value=annual_amortization_item) # Répété pour visuel, on pourrait le fusionner/cacher
 
-            # Appliquer style
-            for col_num in range(1, 6):
+            # Appliquer le style aux cellules de données
+            for col_num in range(1, 8):
                  cell = ws.cell(row=current_row, column=col_num)
-                 is_currency = col_num in [2, 4, 5]
-                 is_int = col_num == 3
+                 is_currency = col_num in [3, 4, 6, 7]
+                 is_int = col_num in [2, 5]
                  set_data_style(cell, is_currency=is_currency)
-                 if is_int: cell.number_format = '0'
-
+                 if is_int: cell.number_format = '0' # Format entier pour Qté et Durée
 
             current_row += 1
 
-        # Ligne Total
-        ws.cell(row=current_row, column=1, value="Total Amortissement Annuel").font = Font(bold=True)
-        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=3)
-        total_cell_annuel = ws.cell(row=current_row, column=4, value=total_annual_amortization)
-        set_data_style(total_cell_annuel, is_currency=True, is_bold=True)
-        # Mettre aussi dans la colonne E pour l'alignement visuel
-        total_cell_cumul = ws.cell(row=current_row, column=5, value=total_annual_amortization)
-        set_data_style(total_cell_cumul, is_currency=True, is_bold=True)
+        # Ligne des Totaux
+        ws.cell(row=current_row, column=1, value="TOTAUX").font = Font(bold=True)
+        ws.merge_cells(start_row=current_row, start_column=1, end_row=current_row, end_column=3) # Fusionner pour le titre Total
+
+        # Afficher le Grand Total Coût
+        total_cost_cell = ws.cell(row=current_row, column=4, value=grand_total_cost)
+        set_data_style(total_cost_cell, is_currency=True, is_bold=True)
+
+        # Afficher le Total Amortissement Annuel
+        total_amort_cell = ws.cell(row=current_row, column=6, value=total_annual_amortization_all_items)
+        set_data_style(total_amort_cell, is_currency=True, is_bold=True)
+        total_amort_cell_2 = ws.cell(row=current_row, column=7, value=total_annual_amortization_all_items) # Répéter
+        set_data_style(total_amort_cell_2, is_currency=True, is_bold=True)
 
 
-        # Ajuster largeur
-        column_widths = {'A': 35, 'B': 20, 'C': 15, 'D': 25, 'E': 25}
+        # Ajuster la largeur des colonnes
+        column_widths = {'A': 35, 'B': 10, 'C': 18, 'D': 20, 'E': 12, 'F': 22, 'G': 25}
         for col_letter, width in column_widths.items():
             ws.column_dimensions[col_letter].width = width
 
@@ -228,22 +230,28 @@ def generate_amortization_excel(user_id, items_list):
         wb.save(excel_path)
         logging.info(f"Excel Amortissement sauvegardé: {excel_path}")
         drive_url = upload_file_to_drive(excel_path)
-        # ... (logging succès/échec upload)
+        if drive_url:
+             logging.info(f"Excel Amortissement uploadé: {drive_url}")
+        else:
+             logging.error(f"Échec upload Excel Amortissement: {excel_path}")
+
 
     except Exception as e:
         logging.exception(f"Erreur génération Excel Amortissement pour {user_id}: {e}")
         drive_url = None
     finally:
-        # ... (fermeture wb et suppression fichier local) ...
+        # Nettoyage du fichier local
         if wb:
              try: wb.close()
-             except Exception: pass
+             except Exception: pass # Ignorer les erreurs de fermeture
         if os.path.exists(excel_path):
-            try: os.remove(excel_path)
-            except OSError as e: logging.error(f"Erreur suppression {excel_path}: {e}")
+            try:
+                os.remove(excel_path)
+                logging.info(f"Fichier local Excel Amortissement supprimé: {excel_path}")
+            except OSError as e:
+                logging.error(f"Erreur suppression fichier Excel Amortissement {excel_path}: {e}")
 
     return drive_url
-
 
 # --- Fonction 3: Coûts Fixes (CFU) - Mise à jour ---
 def generate_cfu_excel(user_id, items_list):
