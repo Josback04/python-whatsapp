@@ -31,8 +31,21 @@ def handle_message(wa_id, message_body, state):
     try:
         if step == "ASK_NAME":
             current_item["name"] = message_body.strip()
-            response = f"Compris : '{current_item['name']}'.\nQuel est son coût d'acquisition ($) ?"
-            state["step"] = "ASK_COST"
+            response = f"Compris : '{current_item['name']}'.\nQuelle est sa quantité? (ex: 3) ?"
+            state["step"] = "ASK_QUANTITY"
+
+        elif step == "ASK_QUANTITY": # <--- Nouvelle étape pour la quantité
+            quantity = int(message_body)
+            if quantity <= 0:
+                response = "La quantité doit être un nombre entier positif (au moins 1). Veuillez corriger."
+                # Rester à l'étape ASK_QUANTITY
+            else:
+                current_item["quantity"] = quantity
+                # Demander la DURÉE DE VIE
+                response = f"Quantité : {quantity}.\nQuel est son coût en dollars (écrivez juste le nombre sans signe '$') ?"
+                state["step"] = "ASK_COST" # Passer à la durée de vie
+
+
 
         elif step == "ASK_COST":
             cost = float(message_body.replace(",", "."))
@@ -43,17 +56,6 @@ def handle_message(wa_id, message_body, state):
                 current_item["cost"] = cost
                 response = f"Coût : {cost:.2f}$.\nQuelle est sa durée de vie utile en années (ex: 5) ?"
                 state["step"] = "ASK_LIFESPAN"
-
-        elif step == "ASK_QUANTITY": # <--- Nouvelle étape pour la quantité
-            quantity = int(message_body)
-            if quantity <= 0:
-                response = "La quantité doit être un nombre entier positif (au moins 1). Veuillez corriger."
-                # Rester à l'étape ASK_QUANTITY
-            else:
-                current_item["quantity"] = quantity
-                # Demander la DURÉE DE VIE
-                response = f"Quantité : {quantity}.\nQuelle est la durée de vie utile en années pour cet actif (ex: 3, 5, 7) ?"
-                state["step"] = "ASK_LIFESPAN" # Passer à la durée de vie
 
         elif step == "ASK_LIFESPAN":
             lifespan = int(message_body)
