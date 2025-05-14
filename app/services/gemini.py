@@ -21,8 +21,7 @@ def ask_ai(user_id):
 
 
     prompt=f"""
-    Analyse ces données et génère un modèle de Business Modèle Structuré basé sur ces données, dans ta réponse évite les réponses génériques du genre 'voici le business modèle pour l'utilisateur etc.' parle à la première personne emploi le 'Je' dans tes phrases  : {formatted_answers}
-    Voici un prompt que vous pouvez utiliser pour demander à un modèle linguistique de répondre aux questions d'un utilisateur en suivant la mise en forme du document "FORMAT BP 2_085015 (1).docx" :
+    Analyse ces données et génère un modèle de Business Modèle Structuré basé sur ces données, dans ta réponse évite les réponses génériques du genre 'voici le business modèle pour l'utilisateur etc.' commence directement par le premier titre établi dans prompt. parle à la première personne emploi le 'Je' dans tes phrases  : {formatted_answers}
 
 **Prompt :**
 
@@ -262,7 +261,7 @@ Conditionnement ,,
     client = genai.Client(api_key=os.environ.get("GEMINI_KEY"))
     response = client.models.generate_content(
         model="gemini-2.0-flash",
-        config=types.GenerateContentConfig(system_instruction="Tu es un coach pour les PME en élaboration des business plan et plan d'affaire."),
+        config=types.GenerateContentConfig(system_instruction=" Tu es un coach pour les PME en élaboration des business plan et plan d'affaire. alors ne mentionne pas tes textes génériques du genre : D'après ce que j'ai compris, vous souhaitez que je vous aide à structurer un business model en inventant les informations nécessaires, en partant de quelques bribes que vous m'avez fournies. Voici ce que je vous propose. Je vais me concentrer sur l'entrepreneur  et développer un business plan complet à partir de là, en comblant les lacunes avec des données imaginaires mais cohérentes."),
         contents=prompt
     )
 

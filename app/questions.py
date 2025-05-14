@@ -1,10 +1,9 @@
 QUESTIONS = {
     "Génération de la valeur": [ 
-       " Bienvenu chez I&F Entrepreneuriat ! 😊 Je suis votre Coach et ensemble, on va collecter quelques informations pour vous aider à élaborer votre candidature COPA. 💼 Vous êtes prêt ? 🚀",
         "Pouvez-vous me parler de vous en tant qu'entrepreneur ? Quel est votre parcours, votre formation, et qu'est-ce qui vous a motivé à vous lancer dans ce projet ?",
         "Quelles sont les difficultés que vous avez rencontrées jusqu'à présent dans votre travail, et comment comptez-vous les surmonter ?",
         "Quels sont ses points forts et comment compte-t-il les utiliser dans l’entreprise ?",
-                "Qui sont les personnes qui vous soutiennent dans ce projet, et en quoi leur soutien est-il important pour vous ?",
+        "Qui sont les personnes qui vous soutiennent dans ce projet, et en quoi leur soutien est-il important pour vous ?",
         "Pouvez-vous me décrire votre entreprise en quelques mots ? Quel est son objectif principal et à quel stade de développement se trouve-t-elle actuellement ?",
         "Comment est organisée votre équipe managériale ? Qui sont les associés et quels sont leurs rôles dans l'entreprise ?",
     ],
@@ -44,14 +43,6 @@ QUESTIONS = {
         "Parties prenantes":[
             "Qui sont les principales parties prenantes de votre projet, et quel est leur rôle dans la réussite de celui-ci ?",
             "Quelles sont les attentes de ces parties prenantes, et comment comptez-vous les satisfaire ?"
-        ],
-        "Banques et partenaires financiers":[
-            "Avez-vous déjà établi des contacts avec des banques ou des institutions financières pour obtenir des prêts ou des financements ? Si oui, quelles sont les conditions proposées ?",
-            "Comment comptez-vous gérer les remboursements d'emprunts ou les dividendes pour les investisseurs ?"
-        ],
-        "Gestion de fonds":[
-            "Comment comptez-vous gérer les salaires de vos employés et les coûts fixes de votre entreprise ? Avez-vous déjà prévu un budget pour cela ?",
-            "Comment allez-vous gérer les taxes et les marges bénéficiaires pour assurer la pérennité de votre entreprise ?"
         ],
         "Étude de marché" : [
             "Avez-vous réalisé une étude de marché avant de lancer votre projet ? Si oui, quelles sont les principales conclusions que vous en avez tirées ?",

@@ -14,6 +14,7 @@ def start_formulaire(wa_id):
     category_index = 0
     question_index = 0
     current_category = CATEGORY_ORDER[category_index]
+    questions_in_category = len(QUESTIONS[current_category])
     response = QUESTIONS[current_category][question_index]
     
     # Le premier message est spécial (Bienvenue), on peut l'adapter si besoin
@@ -22,6 +23,7 @@ def start_formulaire(wa_id):
     state = {
         "module": "FORMULAIRE",
         "category_index": category_index,
+        "question_index": question_index,
         "question_index": question_index,
     }
     state["response"] = response # Ajouter la réponse à envoyer dans l'état retourné
@@ -34,8 +36,12 @@ def handle_message(wa_id, message_body, state):
 
     logging.info(f"Traitement FORMULAIRE pour {wa_id}: {message_body}")
     
+
     category_index = state.get("category_index", 0)
     question_index = state.get("question_index", 0)
+    current_category = CATEGORY_ORDER[category_index]
+    questions_total = state.get("questions_total", len(QUESTIONS[current_category])) # Get from state or calculate
+
     
     # Gérer les cas où l'état pourrait être corrompu (indices invalides)
     try:
@@ -78,7 +84,7 @@ def handle_message(wa_id, message_body, state):
             # ---> FIN DU FORMULAIRE <---
             
             # 1. Envoyer un message d'attente IMMÉDIATEMENT
-            processing_response = "Merci d'avoir répondu à toutes les questions ! 😊 Votre document est en cours de préparation et de sauvegarde..."
+            processing_response = f"Merci d'avoir répondu à toutes les questions ! 😊 ({questions_total}/{questions_total}) Votre document est en cours de préparation et de sauvegarde..."
             processing_data = get_text_message_input(wa_id, processing_response)
             if not send_message(processing_data):
                  logging.error(f"Échec de l'envoi du message d'attente à {wa_id}")
@@ -122,8 +128,8 @@ def handle_message(wa_id, message_body, state):
                  # S'assurer que la nouvelle catégorie est valide
                  if current_category not in QUESTIONS or not QUESTIONS[current_category]:
                      raise ValueError(f"La catégorie '{current_category}' est vide ou invalide.")
-                 
-                 response = QUESTIONS[current_category][question_index] # Première question de la nouvelle catégorie
+                 questions_in_category = len(QUESTIONS[current_category])
+                 response = f"{QUESTIONS[current_category][question_index]} ({question_index + 1}/{questions_in_category})" # Première question de la nouvelle catégorie
                  state["category_index"] = category_index
                  state["question_index"] = question_index
                  state["response"] = response
@@ -139,7 +145,7 @@ def handle_message(wa_id, message_body, state):
 
     else: # ---> QUESTION SUIVANTE (même catégorie) <---
          try:
-             response = QUESTIONS[current_category][question_index]
+             response = f"{QUESTIONS[current_category][question_index]} ({question_index + 1}/{questions_total})"
              state["question_index"] = question_index
              state["response"] = response
              # Retourner l'état mis à jour pour poser la question suivante
