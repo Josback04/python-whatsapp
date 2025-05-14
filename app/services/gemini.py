@@ -20,7 +20,7 @@ def ask_ai(user_id):
         formatted_answers = "Aucune reponse trouvée"
 
 
-    prompt=f"""
+    prompt=f""" Dans ta réponse ne fais aucune introduction. commence directement par le Titre "Génération de la valeur"
     Analyse ces données et génère un modèle de Business Modèle Structuré basé sur ces données, dans ta réponse évite les réponses génériques du genre 'voici le business modèle pour l'utilisateur etc.' commence directement par le premier titre établi dans prompt. parle à la première personne emploi le 'Je' dans tes phrases  : {formatted_answers}
 
 **Prompt :**
