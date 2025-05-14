@@ -176,7 +176,7 @@ def generate_amortization_excel(user_id, items_list):
         for item in items_list:
             name = item.get('name', 'N/A')
             quantity = item.get('quantity', 0) # Obtenir la quantité
-            unit_cost = item.get('unit_cost', 0.0) # Obtenir le coût unitaire
+            unit_cost = item.get('cost', 0.0) # Obtenir le coût unitaire
             lifespan = item.get('lifespan', 0)
 
             # Calculer le coût total et l'amortissement pour cet item
